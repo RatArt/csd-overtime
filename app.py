@@ -357,14 +357,13 @@ def admin_users():
 @app.route('/admin/users/create', methods=['POST'])
 @login_required
 def admin_create_user():
-    """Create a new user (admin only)."""
+    """Create a new user (admin only - common users only)."""
     if not current_user.is_admin():
         flash('Access denied. Admin privileges required.', 'error')
         return redirect(url_for('dashboard'))
 
     username = request.form.get('username')
     password = request.form.get('password')
-    user_type = request.form.get('user_type', 'common')
     group_id = request.form.get('group_id', type=int)
 
     # Validation
@@ -382,25 +381,15 @@ def admin_create_user():
         flash(f'Username "{username}" already exists', 'error')
         return redirect(url_for('admin_users'))
 
-    # Create user
+    # Create user (always common type)
     new_user = User(
         username=username,
-        user_type=user_type,
+        user_type='common',
         group_id=group_id
     )
     new_user.set_password(password)
     db.session.add(new_user)
     db.session.commit()
-
-    # If admin, assign managed groups
-    if user_type == 'admin':
-        managed_group_ids = request.form.getlist('managed_groups')
-        for gid in managed_group_ids:
-            gid = int(gid)
-            if current_user.can_manage_group(gid):
-                admin_group = AdminGroup(admin_id=new_user.id, group_id=gid)
-                db.session.add(admin_group)
-        db.session.commit()
 
     logger.info(f"User created by admin: Admin {current_user.username} (ID: {current_user.id}) created user {username} (ID: {new_user.id})")
     flash(f'User "{username}" created successfully', 'success')
@@ -410,12 +399,17 @@ def admin_create_user():
 @app.route('/admin/users/edit/<int:user_id>', methods=['POST'])
 @login_required
 def admin_edit_user(user_id):
-    """Edit a user (admin only)."""
+    """Edit a user (admin only - common users only)."""
     if not current_user.is_admin():
         flash('Access denied. Admin privileges required.', 'error')
         return redirect(url_for('dashboard'))
 
     user = User.query.get_or_404(user_id)
+
+    # Only allow editing common users
+    if user.is_admin():
+        flash('Cannot edit admin users. Use manage_users.py script instead.', 'error')
+        return redirect(url_for('admin_users'))
 
     # Check if admin can manage this user's group
     if not current_user.can_manage_group(user.group_id):
@@ -424,12 +418,11 @@ def admin_edit_user(user_id):
 
     username = request.form.get('username')
     password = request.form.get('password')
-    user_type = request.form.get('user_type')
     group_id = request.form.get('group_id', type=int)
 
     # Validation
-    if not username or not user_type or not group_id:
-        flash('Username, user type, and group are required', 'error')
+    if not username or not group_id:
+        flash('Username and group are required', 'error')
         return redirect(url_for('admin_users'))
 
     # Check if admin can manage the new group
@@ -446,34 +439,12 @@ def admin_edit_user(user_id):
     # Update user
     old_username = user.username
     user.username = username
-    user.user_type = user_type
     user.group_id = group_id
 
     if password:
         user.set_password(password)
 
-    # Commit user changes first
     db.session.commit()
-
-    # Only update admin groups if the update_managed_groups indicator is present
-    if request.form.get('update_managed_groups') == '1':
-        if user_type == 'admin':
-            # Remove old admin groups
-            AdminGroup.query.filter_by(admin_id=user.id).delete()
-            db.session.commit()
-
-            # Add new admin groups
-            managed_group_ids = request.form.getlist('managed_groups')
-            for gid in managed_group_ids:
-                gid = int(gid)
-                if current_user.can_manage_group(gid):
-                    admin_group = AdminGroup(admin_id=user.id, group_id=gid)
-                    db.session.add(admin_group)
-            db.session.commit()
-        else:
-            # If changing from admin to common, remove all admin groups
-            AdminGroup.query.filter_by(admin_id=user.id).delete()
-            db.session.commit()
 
     logger.info(f"User edited by admin: Admin {current_user.username} (ID: {current_user.id}) edited user {old_username} -> {username} (ID: {user.id})")
     flash(f'User "{username}" updated successfully', 'success')
@@ -483,16 +454,16 @@ def admin_edit_user(user_id):
 @app.route('/admin/users/delete/<int:user_id>', methods=['POST'])
 @login_required
 def admin_delete_user(user_id):
-    """Delete a user (admin only)."""
+    """Delete a user (admin only - common users only)."""
     if not current_user.is_admin():
         flash('Access denied. Admin privileges required.', 'error')
         return redirect(url_for('dashboard'))
 
     user = User.query.get_or_404(user_id)
 
-    # Prevent deleting yourself
-    if user.id == current_user.id:
-        flash('You cannot delete yourself', 'error')
+    # Only allow deleting common users
+    if user.is_admin():
+        flash('Cannot delete admin users. Use manage_users.py script instead.', 'error')
         return redirect(url_for('admin_users'))
 
     # Check if admin can manage this user's group

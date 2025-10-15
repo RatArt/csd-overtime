@@ -149,14 +149,6 @@
     .checkbox-item input[type="checkbox"] {
         width: auto;
     }
-
-    #adminGroupsSection {
-        display: none;
-    }
-
-    #adminGroupsSection.show {
-        display: block;
-    }
 </style>
 {% endblock %}
 
@@ -197,9 +189,11 @@
                 {% endif %}
             </td>
             <td>
-                <button class="action-btn edit-btn" onclick="showEditUserModal({{ user.id }}, '{{ user.username }}', '{{ user.user_type }}', {{ user.group_id }}, [{{ user.managed_groups | map(attribute='group_id') | list | join(',') }}])">Edit</button>
-                {% if user.id != current_user.id %}
+                {% if not user.is_admin() %}
+                <button class="action-btn edit-btn" onclick="showEditUserModal({{ user.id }}, '{{ user.username }}', {{ user.group_id }})">Edit</button>
                 <button class="action-btn delete-btn" onclick="confirmDeleteUser({{ user.id }}, '{{ user.username }}')">Delete</button>
+                {% else %}
+                <span style="color: #999; font-size: 12px;">Use manage_users.py</span>
                 {% endif %}
             </td>
         </tr>
@@ -216,17 +210,13 @@
 <form id="createUserForm" method="POST" action="{{ url_for('admin_create_user') }}" style="display: none;">
     <input type="hidden" name="username" id="create_username">
     <input type="hidden" name="password" id="create_password">
-    <input type="hidden" name="user_type" id="create_user_type">
     <input type="hidden" name="group_id" id="create_group_id">
-    <div id="create_managed_groups_hidden"></div>
 </form>
 
 <form id="editUserForm" method="POST" style="display: none;">
     <input type="hidden" name="username" id="edit_username">
     <input type="hidden" name="password" id="edit_password">
-    <input type="hidden" name="user_type" id="edit_user_type">
     <input type="hidden" name="group_id" id="edit_group_id">
-    <div id="edit_managed_groups_hidden"></div>
 </form>
 
 <form id="deleteUserForm" method="POST" style="display: none;"></form>
@@ -257,30 +247,12 @@
                     <input type="password" id="modal_create_password" required>
                 </div>
                 <div class="form-group-modal">
-                    <label for="modal_create_user_type">User Type</label>
-                    <select id="modal_create_user_type" onchange="toggleAdminGroups('create')">
-                        <option value="common">Common</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
-                <div class="form-group-modal">
                     <label for="modal_create_group">Group</label>
                     <select id="modal_create_group" required>
                         {% for group in managed_groups %}
                         <option value="{{ group.id }}">{{ group.name }}</option>
                         {% endfor %}
                     </select>
-                </div>
-                <div class="form-group-modal" id="create_admin_groups_section" style="display: none;">
-                    <label>Managed Groups (for admin)</label>
-                    <div class="checkbox-group">
-                        {% for group in managed_groups %}
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="create_managed_groups" value="{{ group.id }}">
-                            {{ group.name }}
-                        </label>
-                        {% endfor %}
-                    </div>
                 </div>
             </div>
         `;
@@ -293,7 +265,7 @@
         modal.classList.add('show');
     }
 
-    function showEditUserModal(userId, username, userType, groupId, managedGroups) {
+    function showEditUserModal(userId, username, groupId) {
         currentUserId = userId;
         const modal = document.getElementById('messageModal');
         const footer = document.getElementById('modalFooter');
@@ -301,19 +273,6 @@
         document.querySelector('.modal-icon').textContent = '✏️';
         document.querySelector('.modal-icon').className = 'modal-icon info';
         document.getElementById('modalTitle').textContent = 'Edit User';
-
-        const isAdmin = userType === 'admin';
-
-        // Build checkboxes HTML
-        let checkboxesHTML = '';
-        {% for group in managed_groups %}
-        checkboxesHTML += `
-            <label class="checkbox-item">
-                <input type="checkbox" name="edit_managed_groups" value="{{ group.id }}" ${managedGroups.includes({{ group.id }}) ? 'checked' : ''}>
-                {{ group.name }}
-            </label>
-        `;
-        {% endfor %}
 
         // Build group options HTML
         let groupOptionsHTML = '';
@@ -332,23 +291,10 @@
                     <input type="password" id="modal_edit_password">
                 </div>
                 <div class="form-group-modal">
-                    <label for="modal_edit_user_type">User Type</label>
-                    <select id="modal_edit_user_type" onchange="toggleAdminGroups('edit')">
-                        <option value="common" ${userType === 'common' ? 'selected' : ''}>Common</option>
-                        <option value="admin" ${userType === 'admin' ? 'selected' : ''}>Admin</option>
-                    </select>
-                </div>
-                <div class="form-group-modal">
                     <label for="modal_edit_group">Group</label>
                     <select id="modal_edit_group" required>
                         ${groupOptionsHTML}
                     </select>
-                </div>
-                <div class="form-group-modal" id="edit_admin_groups_section" style="display: ${isAdmin ? 'block' : 'none'};">
-                    <label>Managed Groups (for admin)</label>
-                    <div class="checkbox-group">
-                        ${checkboxesHTML}
-                    </div>
                 </div>
             </div>
         `;
@@ -361,16 +307,9 @@
         modal.classList.add('show');
     }
 
-    function toggleAdminGroups(mode) {
-        const userType = document.getElementById(`modal_${mode}_user_type`).value;
-        const section = document.getElementById(`${mode}_admin_groups_section`);
-        section.style.display = userType === 'admin' ? 'block' : 'none';
-    }
-
     function submitCreateUser() {
         const username = document.getElementById('modal_create_username').value;
         const password = document.getElementById('modal_create_password').value;
-        const userType = document.getElementById('modal_create_user_type').value;
         const groupId = document.getElementById('modal_create_group').value;
 
         if (!username || !password || !groupId) {
@@ -380,21 +319,7 @@
 
         document.getElementById('create_username').value = username;
         document.getElementById('create_password').value = password;
-        document.getElementById('create_user_type').value = userType;
         document.getElementById('create_group_id').value = groupId;
-
-        // Add managed groups checkboxes
-        const managedGroupsContainer = document.getElementById('create_managed_groups_hidden');
-        managedGroupsContainer.innerHTML = '';
-        if (userType === 'admin') {
-            document.querySelectorAll('input[name="create_managed_groups"]:checked').forEach(cb => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'managed_groups';
-                input.value = cb.value;
-                managedGroupsContainer.appendChild(input);
-            });
-        }
 
         document.getElementById('createUserForm').submit();
     }
@@ -402,7 +327,6 @@
     function submitEditUser() {
         const username = document.getElementById('modal_edit_username').value;
         const password = document.getElementById('modal_edit_password').value;
-        const userType = document.getElementById('modal_edit_user_type').value;
         const groupId = document.getElementById('modal_edit_group').value;
 
         if (!username || !groupId) {
@@ -415,29 +339,7 @@
 
         document.getElementById('edit_username').value = username;
         document.getElementById('edit_password').value = password;
-        document.getElementById('edit_user_type').value = userType;
         document.getElementById('edit_group_id').value = groupId;
-
-        // Add managed groups checkboxes
-        const managedGroupsContainer = document.getElementById('edit_managed_groups_hidden');
-        managedGroupsContainer.innerHTML = '';
-
-        // Always add a hidden field to indicate we're updating managed groups
-        const updateIndicator = document.createElement('input');
-        updateIndicator.type = 'hidden';
-        updateIndicator.name = 'update_managed_groups';
-        updateIndicator.value = '1';
-        managedGroupsContainer.appendChild(updateIndicator);
-
-        if (userType === 'admin') {
-            document.querySelectorAll('input[name="edit_managed_groups"]:checked').forEach(cb => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'managed_groups';
-                input.value = cb.value;
-                managedGroupsContainer.appendChild(input);
-            });
-        }
 
         form.submit();
     }
