@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - Overtime Management{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .admin-header {
+        margin-bottom: 30px;
+    }
+
+    .admin-header h1 {
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .filter-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+
+    .filter-section h3 {
+        color: #555;
+        margin-bottom: 15px;
+        font-size: 18px;
+    }
+
+    .filter-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        align-items: end;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .filter-group label {
+        margin-bottom: 5px;
+        color: #555;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .filter-group select,
+    .filter-group input {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+
+    .filter-btn {
+        padding: 10px 20px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .filter-btn:hover {
+        background: #5568d3;
+    }
+
+    .reset-btn {
+        padding: 10px 20px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .reset-btn:hover {
+        background: #5a6268;
+    }
+
+    .quick-filters {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+
+    .quick-filter-btn {
+        padding: 8px 16px;
+        background: #f8f9fa;
+        color: #667eea;
+        border: 2px solid #667eea;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.3s;
+    }
+
+    .quick-filter-btn:hover {
+        background: #667eea;
+        color: white;
+    }
+
+    .quick-filter-btn.active {
+        background: #667eea;
+        color: white;
+    }
+
+    .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+    }
+
+    .summary-table th {
+        background: #667eea;
+        color: white;
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+    }
+
+    .summary-table td {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .summary-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .view-details-btn {
+        padding: 6px 12px;
+        background: #28a745;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-size: 14px;
+        transition: background 0.3s;
+    }
+
+    .view-details-btn:hover {
+        background: #218838;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 40px;
+        color: #999;
+    }
+
+    .total-hours {
+        font-weight: bold;
+        color: #667eea;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-header">
+    <h1>Admin Panel</h1>
+    <p>View and manage overtime records for your teams</p>
+</div>
+
+<div class="filter-section">
+    <h3>Filter Overtime Records</h3>
+
+    <div class="quick-filters">
+        <button type="button" class="quick-filter-btn" onclick="setQuickFilter('today')">Today</button>
+        <button type="button" class="quick-filter-btn" onclick="setQuickFilter('week')">Last 7 Days</button>
+        <button type="button" class="quick-filter-btn" onclick="setQuickFilter('month')">Last 30 Days</button>
+    </div>
+
+    <form method="GET" action="{{ url_for('admin_panel') }}" class="filter-form" id="filterForm">
+        <div class="filter-group">
+            <label for="group_id">Group</label>
+            <select id="group_id" name="group_id">
+                <option value="">All Groups</option>
+                {% for group in managed_groups %}
+                <option value="{{ group.id }}" {% if selected_group == group.id %}selected{% endif %}>
+                    {{ group.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="start_date">Start Date</label>
+            <input type="date" id="start_date" name="start_date" value="{{ start_date or '' }}">
+        </div>
+        <div class="filter-group">
+            <label for="end_date">End Date</label>
+            <input type="date" id="end_date" name="end_date" value="{{ end_date or '' }}">
+        </div>
+        <div class="filter-group">
+            <button type="submit" class="filter-btn">Apply Filters</button>
+        </div>
+        <div class="filter-group">
+            <a href="{{ url_for('admin_panel') }}" class="reset-btn">Reset</a>
+        </div>
+    </form>
+</div>
+
+{% if overtime_summary %}
+<table class="summary-table">
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Group</th>
+            <th>Total Overtime</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user_stat in overtime_summary %}
+        <tr>
+            <td>{{ user_stat.username }}</td>
+            <td>{{ user_stat.group_name }}</td>
+            <td class="total-hours">{{ user_stat.total_hours }}h {{ user_stat.total_mins }}m</td>
+            <td>
+                <a href="{{ url_for('admin_user_details', user_id=user_stat.user_id) }}" class="view-details-btn">
+                    View Details
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="no-data">
+    <p>No overtime records found for the selected filters.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function setQuickFilter(type) {
+        const today = new Date();
+        let startDate, endDate;
+
+        // Calculate date range based on filter type
+        if (type === 'today') {
+            startDate = endDate = formatDate(today);
+        } else if (type === 'week') {
+            const weekAgo = new Date(today);
+            weekAgo.setDate(today.getDate() - 6);
+            startDate = formatDate(weekAgo);
+            endDate = formatDate(today);
+        } else if (type === 'month') {
+            const monthAgo = new Date(today);
+            monthAgo.setDate(today.getDate() - 29);
+            startDate = formatDate(monthAgo);
+            endDate = formatDate(today);
+        }
+
+        // Set the date inputs
+        document.getElementById('start_date').value = startDate;
+        document.getElementById('end_date').value = endDate;
+
+        // Submit the form
+        document.getElementById('filterForm').submit();
+    }
+
+    function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    // Highlight active quick filter on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        const startDate = '{{ start_date or "" }}';
+        const endDate = '{{ end_date or "" }}';
+        const today = formatDate(new Date());
+
+        const buttons = document.querySelectorAll('.quick-filter-btn');
+
+        if (startDate === today && endDate === today) {
+            buttons[0].classList.add('active'); // Today
+        } else if (startDate && endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 6 && endDate === today) {
+                buttons[1].classList.add('active'); // Last 7 Days
+            } else if (diffDays === 29 && endDate === today) {
+                buttons[2].classList.add('active'); // Last 30 Days
+            }
+        }
+    });
+</script>
+{% endblock %}

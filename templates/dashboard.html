@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Overtime Management{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 30px;
+        margin-top: 20px;
+    }
+
+    .add-overtime-section {
+        background: #f8f9fa;
+        padding: 25px;
+        border-radius: 8px;
+    }
+
+    .add-overtime-section h2 {
+        color: #333;
+        margin-bottom: 20px;
+        font-size: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        color: #555;
+        font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+
+    .form-group textarea {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 12px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .submit-btn:hover {
+        background: #5568d3;
+    }
+
+    .overtime-records-section h2 {
+        color: #333;
+        margin-bottom: 20px;
+        font-size: 20px;
+    }
+
+    .total-summary {
+        background: #667eea;
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .total-summary h3 {
+        font-size: 18px;
+        margin-bottom: 10px;
+    }
+
+    .total-summary .total-time {
+        font-size: 32px;
+        font-weight: bold;
+    }
+
+    .overtime-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .overtime-table th {
+        background: #f8f9fa;
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #555;
+        border-bottom: 2px solid #ddd;
+    }
+
+    .overtime-table td {
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .overtime-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .no-records {
+        text-align: center;
+        padding: 40px;
+        color: #999;
+    }
+
+    @media (max-width: 768px) {
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Your Dashboard</h1>
+
+<div class="dashboard-grid">
+    <div class="add-overtime-section">
+        <h2>Add Overtime</h2>
+        <form method="POST" action="{{ url_for('dashboard') }}">
+            <div class="form-group">
+                <label for="date">Date</label>
+                <input type="date" id="date" name="date" required max="{{ today }}">
+            </div>
+            <div class="form-group">
+                <label for="minutes">Duration (minutes)</label>
+                <input type="number" id="minutes" name="minutes" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" required></textarea>
+            </div>
+            <button type="submit" class="submit-btn">Add Overtime</button>
+        </form>
+    </div>
+
+    <div class="overtime-records-section">
+        <h2>Your Overtime Records</h2>
+
+        <div class="total-summary">
+            <h3>Total Overtime</h3>
+            <div class="total-time">{{ total_hours }}h {{ total_mins }}m</div>
+        </div>
+
+        {% if overtime_records %}
+        <table class="overtime-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Duration</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in overtime_records %}
+                <tr>
+                    <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ record.get_hours_formatted() }}</td>
+                    <td>{{ record.description }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="no-records">
+            <p>No overtime records yet. Add your first entry using the form on the left!</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Set max date to today
+    document.getElementById('date').valueForAttribute = new Date().toISOString().split('T')[0];
+</script>
+{% endblock %}
