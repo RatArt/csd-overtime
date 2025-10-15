@@ -84,7 +84,6 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             logger.info(f"User logged in: {username} (ID: {user.id}, Type: {user.user_type})")
-            flash('Login successful!', 'success')
             return redirect(url_for('dashboard'))
         else:
             logger.warning(f"Failed login attempt for username: {username}")
@@ -101,7 +100,6 @@ def logout():
     user_id = current_user.id
     logout_user()
     logger.info(f"User logged out: {username} (ID: {user_id})")
-    flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
 

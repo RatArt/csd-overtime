@@ -228,6 +228,12 @@
     </div>
 
     <script>
+        function decodeHTMLEntities(text) {
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = text;
+            return textarea.value;
+        }
+
         function showModal(type, title, message, callback) {
             const modal = document.getElementById('messageModal');
             const icon = document.getElementById('modalIcon');
@@ -247,7 +253,7 @@
             }
 
             titleEl.textContent = title;
-            body.textContent = message;
+            body.textContent = decodeHTMLEntities(message);
 
             // Store callback for OK button
             window.modalCallback = callback;
@@ -265,7 +271,7 @@
             icon.textContent = '⚠️';
             icon.className = 'modal-icon error';
             titleEl.textContent = title;
-            body.textContent = message;
+            body.textContent = decodeHTMLEntities(message);
 
             // Update footer with confirm/cancel buttons
             footer.innerHTML = `
