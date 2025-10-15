@@ -158,6 +158,107 @@ def create_group():
 
         print(f"Group '{name}' created successfully with ID {group.id}")
 
+def change_username():
+    """Change a user's username."""
+    with app.app_context():
+        print("\n=== Change Username ===")
+        old_username = input("Current username: ")
+        user = User.query.filter_by(username=old_username).first()
+
+        if not user:
+            print(f"User '{old_username}' not found")
+            return
+
+        new_username = input("New username: ")
+
+        # Check if new username already exists
+        if User.query.filter_by(username=new_username).first():
+            print(f"Username '{new_username}' already exists")
+            return
+
+        user.username = new_username
+        db.session.commit()
+
+        print(f"Username changed from '{old_username}' to '{new_username}' successfully")
+
+def change_user_group():
+    """Change a user's group."""
+    with app.app_context():
+        print("\n=== Change User Group ===")
+        username = input("Username: ")
+        user = User.query.filter_by(username=username).first()
+
+        if not user:
+            print(f"User '{username}' not found")
+            return
+
+        print(f"\nCurrent group: {user.group.name}")
+
+        # Show available groups
+        groups = Group.query.all()
+        print("\nAvailable groups:")
+        for group in groups:
+            print(f"  {group.id}: {group.name}")
+
+        group_id = int(input("\nNew group ID: "))
+
+        # Check if group exists
+        group = Group.query.get(group_id)
+        if not group:
+            print(f"Group with ID {group_id} not found")
+            return
+
+        user.group_id = group_id
+        db.session.commit()
+
+        print(f"User '{username}' moved to group '{group.name}' successfully")
+
+def manage_admin_groups():
+    """Manage which groups an admin can manage."""
+    with app.app_context():
+        print("\n=== Manage Admin Groups ===")
+        username = input("Admin username: ")
+        user = User.query.filter_by(username=username).first()
+
+        if not user:
+            print(f"User '{username}' not found")
+            return
+
+        if not user.is_admin():
+            print(f"User '{username}' is not an admin")
+            return
+
+        # Show current managed groups
+        current_groups = [ag.group.name for ag in user.managed_groups]
+        print(f"\nCurrent managed groups: {', '.join(current_groups) if current_groups else 'None'}")
+
+        # Show available groups
+        groups = Group.query.all()
+        print("\nAvailable groups:")
+        for group in groups:
+            print(f"  {group.id}: {group.name}")
+
+        print("\nEnter group IDs separated by comma (e.g., 1,2,3)")
+        print("Leave empty to remove all managed groups")
+        managed_group_ids = input("Managed group IDs: ")
+
+        # Remove all current admin groups
+        for ag in user.managed_groups:
+            db.session.delete(ag)
+
+        # Add new admin groups
+        if managed_group_ids.strip():
+            for gid in managed_group_ids.split(','):
+                gid = int(gid.strip())
+                if Group.query.get(gid):
+                    admin_group = AdminGroup(admin_id=user.id, group_id=gid)
+                    db.session.add(admin_group)
+                else:
+                    print(f"Warning: Group ID {gid} not found, skipping")
+
+        db.session.commit()
+        print("Admin groups updated successfully")
+
 def delete_user():
     """Delete a user."""
     with app.app_context():
@@ -190,8 +291,11 @@ def main():
         print("3. Create new user")
         print("4. Create new group")
         print("5. Change user password")
-        print("6. Make user admin")
-        print("7. Delete user")
+        print("6. Change username")
+        print("7. Change user group")
+        print("8. Make user admin")
+        print("9. Manage admin groups")
+        print("10. Delete user")
         print("0. Exit")
         print("="*50)
 
@@ -209,8 +313,14 @@ def main():
             elif choice == '5':
                 change_password()
             elif choice == '6':
-                make_admin()
+                change_username()
             elif choice == '7':
+                change_user_group()
+            elif choice == '8':
+                make_admin()
+            elif choice == '9':
+                manage_admin_groups()
+            elif choice == '10':
                 delete_user()
             elif choice == '0':
                 print("\nGoodbye!")

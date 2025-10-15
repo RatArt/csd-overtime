@@ -200,7 +200,8 @@
                 <span style="color: #666;">Welcome, {{ current_user.username }}{% if current_user.is_admin() %} (Admin){% endif %}</span>
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
                 {% if current_user.is_admin() %}
-                <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
+                <a href="{{ url_for('admin_panel') }}">Overtime Reports</a>
+                <a href="{{ url_for('admin_users') }}">User Management</a>
                 {% endif %}
                 <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
             </nav>

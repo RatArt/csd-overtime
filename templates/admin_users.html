@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - Overtime Management{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .page-header {
+        margin-bottom: 30px;
+    }
+
+    .page-header h1 {
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .create-user-btn {
+        padding: 10px 20px;
+        background: #27ae60;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.3s;
+    }
+
+    .create-user-btn:hover {
+        background: #229954;
+    }
+
+    .users-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+    }
+
+    .users-table th {
+        background: #667eea;
+        color: white;
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+    }
+
+    .users-table td {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .users-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .badge-admin {
+        background: #e74c3c;
+        color: white;
+    }
+
+    .badge-common {
+        background: #3498db;
+        color: white;
+    }
+
+    .action-btn {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-right: 5px;
+        transition: background 0.3s;
+    }
+
+    .edit-btn {
+        background: #f39c12;
+        color: white;
+    }
+
+    .edit-btn:hover {
+        background: #d68910;
+    }
+
+    .delete-btn {
+        background: #e74c3c;
+        color: white;
+    }
+
+    .delete-btn:hover {
+        background: #c0392b;
+    }
+
+    /* Modal form styles */
+    .form-grid {
+        display: grid;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .form-group-modal {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-group-modal label {
+        margin-bottom: 5px;
+        color: #333;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .form-group-modal input,
+    .form-group-modal select {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+    }
+
+    .form-group-modal input:focus,
+    .form-group-modal select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .checkbox-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 150px;
+        overflow-y: auto;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+        width: auto;
+    }
+
+    #adminGroupsSection {
+        display: none;
+    }
+
+    #adminGroupsSection.show {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>User Management</h1>
+    <p>Manage users in your groups</p>
+    <button class="create-user-btn" onclick="showCreateUserModal()">+ Create New User</button>
+</div>
+
+{% if users %}
+<table class="users-table">
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Type</th>
+            <th>Group</th>
+            <th>Managed Groups</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td>{{ user.username }}</td>
+            <td>
+                <span class="badge {% if user.is_admin() %}badge-admin{% else %}badge-common{% endif %}">
+                    {{ user.user_type }}
+                </span>
+            </td>
+            <td>{{ user.group.name }}</td>
+            <td>
+                {% if user.is_admin() %}
+                    {% set managed_groups = user.managed_groups | map(attribute='group.name') | list %}
+                    {{ managed_groups | join(', ') if managed_groups else 'None' }}
+                {% else %}
+                    N/A
+                {% endif %}
+            </td>
+            <td>
+                <button class="action-btn edit-btn" onclick="showEditUserModal({{ user.id }}, '{{ user.username }}', '{{ user.user_type }}', {{ user.group_id }}, [{{ user.managed_groups | map(attribute='group_id') | list | join(',') }}])">Edit</button>
+                {% if user.id != current_user.id %}
+                <button class="action-btn delete-btn" onclick="confirmDeleteUser({{ user.id }}, '{{ user.username }}')">Delete</button>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div style="text-align: center; padding: 40px; color: #999;">
+    <p>No users found in your managed groups.</p>
+</div>
+{% endif %}
+
+<!-- Hidden forms for create/edit/delete -->
+<form id="createUserForm" method="POST" action="{{ url_for('admin_create_user') }}" style="display: none;">
+    <input type="hidden" name="username" id="create_username">
+    <input type="hidden" name="password" id="create_password">
+    <input type="hidden" name="user_type" id="create_user_type">
+    <input type="hidden" name="group_id" id="create_group_id">
+    <div id="create_managed_groups_hidden"></div>
+</form>
+
+<form id="editUserForm" method="POST" style="display: none;">
+    <input type="hidden" name="username" id="edit_username">
+    <input type="hidden" name="password" id="edit_password">
+    <input type="hidden" name="user_type" id="edit_user_type">
+    <input type="hidden" name="group_id" id="edit_group_id">
+    <div id="edit_managed_groups_hidden"></div>
+</form>
+
+<form id="deleteUserForm" method="POST" style="display: none;"></form>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let currentUserId = null;
+
+    function showCreateUserModal() {
+        const modal = document.getElementById('messageModal');
+        const content = document.querySelector('.modal-content');
+        const footer = document.getElementById('modalFooter');
+
+        document.querySelector('.modal-icon').textContent = '👤';
+        document.querySelector('.modal-icon').className = 'modal-icon success';
+        document.getElementById('modalTitle').textContent = 'Create New User';
+
+        document.getElementById('modalBody').innerHTML = `
+            <div class="form-grid">
+                <div class="form-group-modal">
+                    <label for="modal_create_username">Username</label>
+                    <input type="text" id="modal_create_username" required>
+                </div>
+                <div class="form-group-modal">
+                    <label for="modal_create_password">Password</label>
+                    <input type="password" id="modal_create_password" required>
+                </div>
+                <div class="form-group-modal">
+                    <label for="modal_create_user_type">User Type</label>
+                    <select id="modal_create_user_type" onchange="toggleAdminGroups('create')">
+                        <option value="common">Common</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group-modal">
+                    <label for="modal_create_group">Group</label>
+                    <select id="modal_create_group" required>
+                        {% for group in managed_groups %}
+                        <option value="{{ group.id }}">{{ group.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group-modal" id="create_admin_groups_section" style="display: none;">
+                    <label>Managed Groups (for admin)</label>
+                    <div class="checkbox-group">
+                        {% for group in managed_groups %}
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="create_managed_groups" value="{{ group.id }}">
+                            {{ group.name }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        footer.innerHTML = `
+            <button class="modal-btn cancel" onclick="closeModal()">Cancel</button>
+            <button class="modal-btn" onclick="submitCreateUser()">Create User</button>
+        `;
+
+        modal.classList.add('show');
+    }
+
+    function showEditUserModal(userId, username, userType, groupId, managedGroups) {
+        currentUserId = userId;
+        const modal = document.getElementById('messageModal');
+        const footer = document.getElementById('modalFooter');
+
+        document.querySelector('.modal-icon').textContent = '✏️';
+        document.querySelector('.modal-icon').className = 'modal-icon info';
+        document.getElementById('modalTitle').textContent = 'Edit User';
+
+        const isAdmin = userType === 'admin';
+
+        document.getElementById('modalBody').innerHTML = `
+            <div class="form-grid">
+                <div class="form-group-modal">
+                    <label for="modal_edit_username">Username</label>
+                    <input type="text" id="modal_edit_username" value="${username}" required>
+                </div>
+                <div class="form-group-modal">
+                    <label for="modal_edit_password">Password (leave empty to keep current)</label>
+                    <input type="password" id="modal_edit_password">
+                </div>
+                <div class="form-group-modal">
+                    <label for="modal_edit_user_type">User Type</label>
+                    <select id="modal_edit_user_type" onchange="toggleAdminGroups('edit')">
+                        <option value="common" ${userType === 'common' ? 'selected' : ''}>Common</option>
+                        <option value="admin" ${userType === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                </div>
+                <div class="form-group-modal">
+                    <label for="modal_edit_group">Group</label>
+                    <select id="modal_edit_group" required>
+                        {% for group in managed_groups %}
+                        <option value="{{ group.id }}" ${groupId === {{ group.id }} ? 'selected' : ''}>{{ group.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group-modal" id="edit_admin_groups_section" style="display: ${isAdmin ? 'block' : 'none'};">
+                    <label>Managed Groups (for admin)</label>
+                    <div class="checkbox-group">
+                        {% for group in managed_groups %}
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="edit_managed_groups" value="{{ group.id }}" ${managedGroups.includes({{ group.id }}) ? 'checked' : ''}>
+                            {{ group.name }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        footer.innerHTML = `
+            <button class="modal-btn cancel" onclick="closeModal()">Cancel</button>
+            <button class="modal-btn" onclick="submitEditUser()">Save Changes</button>
+        `;
+
+        modal.classList.add('show');
+    }
+
+    function toggleAdminGroups(mode) {
+        const userType = document.getElementById(`modal_${mode}_user_type`).value;
+        const section = document.getElementById(`${mode}_admin_groups_section`);
+        section.style.display = userType === 'admin' ? 'block' : 'none';
+    }
+
+    function submitCreateUser() {
+        const username = document.getElementById('modal_create_username').value;
+        const password = document.getElementById('modal_create_password').value;
+        const userType = document.getElementById('modal_create_user_type').value;
+        const groupId = document.getElementById('modal_create_group').value;
+
+        if (!username || !password || !groupId) {
+            showModal('error', 'Error', 'All fields are required');
+            return;
+        }
+
+        document.getElementById('create_username').value = username;
+        document.getElementById('create_password').value = password;
+        document.getElementById('create_user_type').value = userType;
+        document.getElementById('create_group_id').value = groupId;
+
+        // Add managed groups checkboxes
+        const managedGroupsContainer = document.getElementById('create_managed_groups_hidden');
+        managedGroupsContainer.innerHTML = '';
+        if (userType === 'admin') {
+            document.querySelectorAll('input[name="create_managed_groups"]:checked').forEach(cb => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'managed_groups';
+                input.value = cb.value;
+                managedGroupsContainer.appendChild(input);
+            });
+        }
+
+        document.getElementById('createUserForm').submit();
+    }
+
+    function submitEditUser() {
+        const username = document.getElementById('modal_edit_username').value;
+        const password = document.getElementById('modal_edit_password').value;
+        const userType = document.getElementById('modal_edit_user_type').value;
+        const groupId = document.getElementById('modal_edit_group').value;
+
+        if (!username || !groupId) {
+            showModal('error', 'Error', 'Username and group are required');
+            return;
+        }
+
+        const form = document.getElementById('editUserForm');
+        form.action = `/admin/users/edit/${currentUserId}`;
+
+        document.getElementById('edit_username').value = username;
+        document.getElementById('edit_password').value = password;
+        document.getElementById('edit_user_type').value = userType;
+        document.getElementById('edit_group_id').value = groupId;
+
+        // Add managed groups checkboxes
+        const managedGroupsContainer = document.getElementById('edit_managed_groups_hidden');
+        managedGroupsContainer.innerHTML = '';
+        if (userType === 'admin') {
+            document.querySelectorAll('input[name="edit_managed_groups"]:checked').forEach(cb => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'managed_groups';
+                input.value = cb.value;
+                managedGroupsContainer.appendChild(input);
+            });
+        }
+
+        form.submit();
+    }
+
+    function confirmDeleteUser(userId, username) {
+        showConfirm(
+            'Delete User',
+            `Are you sure you want to delete user "${username}"? This will also delete all their overtime records.`,
+            function() {
+                const form = document.getElementById('deleteUserForm');
+                form.action = `/admin/users/delete/${userId}`;
+                form.submit();
+            }
+        );
+    }
+</script>
+{% endblock %}
