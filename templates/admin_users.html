@@ -304,6 +304,23 @@
 
         const isAdmin = userType === 'admin';
 
+        // Build checkboxes HTML
+        let checkboxesHTML = '';
+        {% for group in managed_groups %}
+        checkboxesHTML += `
+            <label class="checkbox-item">
+                <input type="checkbox" name="edit_managed_groups" value="{{ group.id }}" ${managedGroups.includes({{ group.id }}) ? 'checked' : ''}>
+                {{ group.name }}
+            </label>
+        `;
+        {% endfor %}
+
+        // Build group options HTML
+        let groupOptionsHTML = '';
+        {% for group in managed_groups %}
+        groupOptionsHTML += `<option value="{{ group.id }}" ${groupId === {{ group.id }} ? 'selected' : ''}>{{ group.name }}</option>`;
+        {% endfor %}
+
         document.getElementById('modalBody').innerHTML = `
             <div class="form-grid">
                 <div class="form-group-modal">
@@ -324,20 +341,13 @@
                 <div class="form-group-modal">
                     <label for="modal_edit_group">Group</label>
                     <select id="modal_edit_group" required>
-                        {% for group in managed_groups %}
-                        <option value="{{ group.id }}" ${groupId === {{ group.id }} ? 'selected' : ''}>{{ group.name }}</option>
-                        {% endfor %}
+                        ${groupOptionsHTML}
                     </select>
                 </div>
                 <div class="form-group-modal" id="edit_admin_groups_section" style="display: ${isAdmin ? 'block' : 'none'};">
                     <label>Managed Groups (for admin)</label>
                     <div class="checkbox-group">
-                        {% for group in managed_groups %}
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="edit_managed_groups" value="{{ group.id }}" ${managedGroups.includes({{ group.id }}) ? 'checked' : ''}>
-                            {{ group.name }}
-                        </label>
-                        {% endfor %}
+                        ${checkboxesHTML}
                     </div>
                 </div>
             </div>
