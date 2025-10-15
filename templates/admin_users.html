@@ -421,6 +421,14 @@
         // Add managed groups checkboxes
         const managedGroupsContainer = document.getElementById('edit_managed_groups_hidden');
         managedGroupsContainer.innerHTML = '';
+
+        // Always add a hidden field to indicate we're updating managed groups
+        const updateIndicator = document.createElement('input');
+        updateIndicator.type = 'hidden';
+        updateIndicator.name = 'update_managed_groups';
+        updateIndicator.value = '1';
+        managedGroupsContainer.appendChild(updateIndicator);
+
         if (userType === 'admin') {
             document.querySelectorAll('input[name="edit_managed_groups"]:checked').forEach(cb => {
                 const input = document.createElement('input');

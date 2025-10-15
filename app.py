@@ -455,24 +455,25 @@ def admin_edit_user(user_id):
     # Commit user changes first
     db.session.commit()
 
-    # Update admin groups if user is admin
-    if user_type == 'admin':
-        # Remove old admin groups
-        AdminGroup.query.filter_by(admin_id=user.id).delete()
-        db.session.commit()
+    # Only update admin groups if the update_managed_groups indicator is present
+    if request.form.get('update_managed_groups') == '1':
+        if user_type == 'admin':
+            # Remove old admin groups
+            AdminGroup.query.filter_by(admin_id=user.id).delete()
+            db.session.commit()
 
-        # Add new admin groups
-        managed_group_ids = request.form.getlist('managed_groups')
-        for gid in managed_group_ids:
-            gid = int(gid)
-            if current_user.can_manage_group(gid):
-                admin_group = AdminGroup(admin_id=user.id, group_id=gid)
-                db.session.add(admin_group)
-        db.session.commit()
-    else:
-        # If changing from admin to common, remove all admin groups
-        AdminGroup.query.filter_by(admin_id=user.id).delete()
-        db.session.commit()
+            # Add new admin groups
+            managed_group_ids = request.form.getlist('managed_groups')
+            for gid in managed_group_ids:
+                gid = int(gid)
+                if current_user.can_manage_group(gid):
+                    admin_group = AdminGroup(admin_id=user.id, group_id=gid)
+                    db.session.add(admin_group)
+            db.session.commit()
+        else:
+            # If changing from admin to common, remove all admin groups
+            AdminGroup.query.filter_by(admin_id=user.id).delete()
+            db.session.commit()
 
     logger.info(f"User edited by admin: Admin {current_user.username} (ID: {current_user.id}) edited user {old_username} -> {username} (ID: {user.id})")
     flash(f'User "{username}" updated successfully', 'success')
